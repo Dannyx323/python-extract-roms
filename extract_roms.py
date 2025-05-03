@@ -4,18 +4,17 @@
 import math, os, sys, time, argparse
 
 DEBUG = False
-OUTDIR = ""
 
-def shiftLeft(val, count):
+def shift_left(val, count):
   return val << count
 
-def shiftRight(val, count):
+def shift_right(val, count):
   return val >> count
 
-def to16bit(hi, lo):
+def to_16_bit(hi, lo):
   return (hi << 8) + lo
 
-def bytesToHex(bytes):
+def bytes_to_hex(bytes):
   return ' '.join(list(map(lambda v: f'{v:02X}', bytes)))
 
 def k(val):
@@ -66,21 +65,26 @@ def write_header(handle, bank, mapper):
 def write_rom(file_handle, title, bank, outdir):
 
   file_handle.seek(bank["prgAddr"])
-  prgData = file_handle.read(bank["prgSize"])
+  prg_data = file_handle.read(bank["prgSize"])
   file_handle.seek(bank["chrAddr"])
-  chrData = file_handle.read(bank["chrSize"])
+  chr_data = file_handle.read(bank["chrSize"])
 
-  mapper = guess_mapper(prgData)
+  mapper = guess_mapper(prg_data)
 
   file_path = os.path.join(outdir, title) + ".nes"
   print ("extracting " + file_path + (" (mapper " + str(mapper) + ") from data:" if DEBUG else ""))
-  if DEBUG:
-    print ("    " + bank["bytes"] + " :: " + str(bank["prgSizeK"]) + " PRG @ " + bank["prgAddrHex"] + " / " + str(bank["chrSizeK"]) + " CHR @ " + bank["chrAddrHex"])
   with open(file_path, "wb") as rom_handle:
     write_header (rom_handle, bank, mapper)
-    rom_handle.write(prgData)
-    rom_handle.write(chrData)
+    rom_handle.write(prg_data)
+    rom_handle.write(chr_data)
     rom_handle.close()
+
+  if DEBUG:
+    modified_bytes = "oldBytes" in bank.keys()
+    bytes = bank["bytes"] if not modified_bytes else bank["oldBytes"]
+    print ("    " + bytes + " :: " + str(bank["prgSizeK"]) + " PRG @ " + bank["prgAddrHex"] + " / " + str(bank["chrSizeK"]) + " CHR @ " + bank["chrAddrHex"])
+    if modified_bytes:
+      print ("    " + bank["bytes"])
 
 def process_titles(file_handle, separator, end, max_titles):
 
@@ -125,26 +129,26 @@ def process_banks(file_handle, fn, size, count):
 #    chrBank1  - the value written to $201A
 #    prgBank0  - the value written to $4107
 #    mirror    - the value written to $4106 or $A000
-def process_bank(bytes, indices, chrOffset):
+def process_bank(bytes, indices, chr_offset):
 
   data = {}
-  data["bytes"] = bytesToHex(bytes)
+  data["bytes"] = bytes_to_hex(bytes)
 
   # PRG info
-  data["prgAddr"] = shiftLeft(to16bit(shiftRight(bytes[indices["outerBank"]], 4), bytes[indices["prgBank0"]]), 13)
+  data["prgAddr"] = shift_left(to_16_bit(shift_right(bytes[indices["outerBank"]], 4), bytes[indices["prgBank0"]]), 13)
   data["prgAddrHex"] = f'{data["prgAddr"]:07X}'
-  prgSizeIndex = bytes[indices["prgSize"]]
-  data["prgSize"] = PRG_SIZE[prgSizeIndex]
-  data["prgSizeK"] = PRG_SIZE_K[prgSizeIndex]
-  data["prgSizeHeader"] = PRG_SIZE_HDR[prgSizeIndex]
+  prg_size_index = bytes[indices["prgSize"]]
+  data["prgSize"] = PRG_SIZE[prg_size_index]
+  data["prgSizeK"] = PRG_SIZE_K[prg_size_index]
+  data["prgSizeHeader"] = PRG_SIZE_HDR[prg_size_index]
 
-  # CHR info (chrOffset seems to vary by device)
-  data["chrAddr"] = chrOffset + shiftLeft(to16bit(shiftRight(bytes[indices["chrBank0"]], 4), bytes[indices["chrBank1"]] & 0b11111000), 10)
+  # CHR info (chr_offset seems to vary by device)
+  data["chrAddr"] = chr_offset + shift_left(to_16_bit(shift_right(bytes[indices["chrBank0"]], 4), bytes[indices["chrBank1"]] & 0b11111000), 10)
   data["chrAddrHex"] = f'{data["chrAddr"]:07X}'
-  chrSizeIndex = bytes[indices["chrBank1"]] & 0b00000111
-  data["chrSize"] = CHR_SIZE[chrSizeIndex]
-  data["chrSizeK"] = CHR_SIZE_K[chrSizeIndex]
-  data["chrSizeHeader"] = CHR_SIZE_HDR[chrSizeIndex]
+  chr_size_index = bytes[indices["chrBank1"]] & 0b00000111
+  data["chrSize"] = CHR_SIZE[chr_size_index]
+  data["chrSizeK"] = CHR_SIZE_K[chr_size_index]
+  data["chrSizeHeader"] = CHR_SIZE_HDR[chr_size_index]
 
   data["mirror"] = bytes[indices["mirror"]] ^ 1
   return data
@@ -152,8 +156,8 @@ def process_bank(bytes, indices, chrOffset):
 def process_retro_game_box_bank(bytes):
 
   indices = {"outerBank":0, "prgSize":1, "chrBank0":2, "chrBank1":3, "prgBank0":4, "prgBank1":5, "mirror": 6}
-  chrOffset = (bytes[indices["outerBank"]] & 0x02) * 0x200000
-  data = process_bank(bytes, indices, chrOffset)
+  chr_offset = (bytes[indices["outerBank"]] & 0x02) * 0x200000
+  data = process_bank(bytes, indices, chr_offset)
   return data
 
 def process_retrogame_bank(bytes):
@@ -162,57 +166,55 @@ def process_retrogame_bank(bytes):
     return None
 
   indices = {"outerBank":0, "chrBank0":1, "chrBank1":2, "prgSize":3, "prgBank0":4, "prgBank1":5, "prgBank2":6, "prgBank3":7, "mirror": 8}
-  chrOffset = (bytes[indices["outerBank"]] & 0b00001111) * 0x200000
-  data = process_bank(bytes, indices, chrOffset)
+  chr_offset = (bytes[indices["outerBank"]] & 0b00001111) * 0x200000
+  data = process_bank(bytes, indices, chr_offset)
   return data
 
 def process_mini_arcade_bank(bytes):
-
-  if bytes[0] == 0xFF:
-    return None
 
   newbytes = bytearray(bytes)
 
   indices = {"prgSize":0, "chrBank0":1, "chrBank1":2, "outerBank":5,
              "prgBank0":7, "prgBank1":8, "prgBank2":9, "prgBank3":10, "mirror": 11}
 
-  chrBank0 = math.floor(bytes[6]/64)
+  chr_bank_0 = math.floor(bytes[6]/64)
   if (bytes[7] & 1):
-    chrBank0 = (chrBank0 * 2 + 1) << 4
+    chr_bank_0 = (chr_bank_0 * 2 + 1) << 4
   else:
-    chrBank0 = chrBank0 << 4
+    chr_bank_0 = chr_bank_0 << 4
 
-  # (%64) ASL << 2 $0206 (#$32 to =#$C8*) ORA $0311 (#$06) (=#$CE) STA $201A
-  chrBank1 = ((bytes[6] % 64) << 2) | bytes[2]
+  # (%64) ASL << 2  ORA $0311  STA $201A
+  chr_bank_1 = ((bytes[6] % 64) << 2) | bytes[2]
 
   # reassign byte values
-  newbytes[indices["chrBank0"]] = chrBank0
-  newbytes[indices["chrBank1"]] = chrBank1
+  newbytes[indices["chrBank0"]] = chr_bank_0
+  newbytes[indices["chrBank1"]] = chr_bank_1
 
-  # (%02) (=#$00~) STA $0207  ORA $0312  STA $4100 (=#$30)
-  # (%32) STA $0205  LSR (=#$03)  ASL << 4 (=#$30~) STA $0312
-  outerBank = (((bytes[5] % 32) >> 1) << 4) | math.floor(bytes[7] / 2)
-  newbytes[indices["outerBank"]] = outerBank
+  # (/02) ORA $0312  STA $4100
+  # (%32) LSR  ASL << 4  STA $0312
+  outer_bank = (((bytes[5] % 32) >> 1) << 4) | math.floor(bytes[7] / 2)
+  newbytes[indices["outerBank"]] = outer_bank
 
   # set up PRG banks
-  # mimic LSR ROR
-  prgBank0 = (0b10000000 if (bytes[5] & 1) else 0) | (bytes[4] >> 1)
+  # LSR  ROR
+  prg_bank_0 = (0b10000000 if (bytes[5] & 1) else 0) | (bytes[4] >> 1)
   if bytes[0] >= 5:
-    prgBank2 = prgBank0
-    prgBank1 = prgBank3 = prgBank0 + 1
+    prg_bank_2 = prg_bank_0
+    prg_bank_1 = prg_bank_3 = prg_bank_0 + 1
   else:
-    prgBank1 = prgBank0 + 1
-    prgBank2 = prgBank0 + 2
-    prgBank3 = prgBank0 + 3
+    prg_bank_1 = prg_bank_0 + 1
+    prg_bank_2 = prg_bank_0 + 2
+    prg_bank_3 = prg_bank_0 + 3
 
   # reassign byte values
-  newbytes[indices["prgBank0"]] = prgBank0
-  newbytes[indices["prgBank1"]] = prgBank1
-  newbytes[indices["prgBank2"]] = prgBank2
-  newbytes[indices["prgBank3"]] = prgBank3
+  newbytes[indices["prgBank0"]] = prg_bank_0
+  newbytes[indices["prgBank1"]] = prg_bank_1
+  newbytes[indices["prgBank2"]] = prg_bank_2
+  newbytes[indices["prgBank3"]] = prg_bank_3
 
-  chrOffset = (outerBank & 0b00001111) * 0x200000
-  data = process_bank(newbytes, indices, chrOffset)
+  chr_offset = (outer_bank & 0b00001111) * 0x200000
+  data = process_bank(newbytes, indices, chr_offset)
+  data["oldBytes"] = bytes_to_hex(bytes)
   return data
 
 def set_args(args, defaults):
