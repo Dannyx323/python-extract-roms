@@ -164,25 +164,6 @@ def process_bank(bytes, indices, chr_offset = None):
   data["mirror"] = bytes[indices["mirror"]] ^ 1
   return data
 
-
-def process_retro_game_box_bank(bytes, args):
-
-  indices = {"outerBank":0, "prgSize":1, "chrBank0":2, "chrBank1":3, "prgBank0":4, "prgBank1":5, "mirror": 6}
-  chr_offset = (bytes[indices["outerBank"]] & 0x02) * 0x200000
-  data = process_bank(bytes, indices, chr_offset)
-  return data
-
-
-def process_retrogame_bank(bytes, args):
-
-  if bytes[0] == 0xFF:
-    return None
-
-  indices = {"outerBank":0, "chrBank0":1, "chrBank1":2, "prgSize":3, "prgBank0":4, "prgBank1":5, "prgBank2":6, "prgBank3":7, "mirror": 8}
-  data = process_bank(bytes, indices)
-  return data
-
-
 # this is required to be called first if using process_dynamic_bank
 # args:
 #    code_addr  - the physical code address in the dump
@@ -204,36 +185,6 @@ def setup_emu(file_handle, args):
   args.mem = mem
   return args
 
-# this reads the title pointer data and then processes each title.
-# it must also save the bank data index so that the proper title is applied to each rom
-def process_qss_titles(file_handle, args):
-
-  titles = []
-  pointers = []
-  args.indices = []
-  p = 0
-
-  file_handle.seek(0x7C13A)
-  while (p < 240):
-    lo = int.from_bytes(file_handle.read(1))
-    hi = int.from_bytes(file_handle.read(1))
-    i  = int.from_bytes(file_handle.read(1))
-    file_handle.read(1) # discard the last byte which is always 0
-
-    val = 0x70000 + to_16_bit(hi, lo)
-    pointers.append(val)
-
-    # this is how the correct title will be applied later
-    args.indices.append(i)
-
-    p += 1
-
-  args.count = 1
-  for pointer in pointers:
-    file_handle.seek(pointer)
-    titles.extend(process_titles(file_handle, args))
-
-  return titles
 
 # this processes a game's bank data by executing 6502 from the dump.
 # it then reads the resulting registers for final processing and extraction
