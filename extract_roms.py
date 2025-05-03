@@ -36,12 +36,13 @@ def guess_mapper(data):
 
   if data.find(b'\x8D\x00\x41') != -1: # STA $4100
     mapper = 256
+  elif data.find(b'\x8D\x01\x80') != -1 or \
+       data.find(b'\x8E\x01\x80') != -1:     # STA/STX $8001 $8001
+    mapper = 4
   elif data.find(b'\x8D\x00\xE0\x4A') != -1 or \
        data.find(b'\x8D\x00\xC0\x4A') != -1 or \
        data.find(b'\x8D\x00\xA0\x4A') != -1:     # STA $E000/$C000/$A000 LSR
     mapper = 1
-  elif data.find(b'\x8D\x01\x80') != -1: # STA $8001
-    mapper = 4
   else:
     mapper = 0
   return mapper
