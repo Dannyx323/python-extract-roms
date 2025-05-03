@@ -136,7 +136,7 @@ def process_banks(file_handle, args):
 #    chrBank1  - the value written to $201A
 #    prgBank0  - the value written to $4107
 #    mirror    - the value written to $4106 or $A000
-def process_bank(bytes, indices, chr_offset):
+def process_bank(bytes, indices, chr_offset = None):
 
   data = {}
   data["bytes"] = bytes_to_hex(bytes)
@@ -149,7 +149,10 @@ def process_bank(bytes, indices, chr_offset):
   data["prgSizeK"] = PRG_SIZE_K[prg_size_index]
   data["prgSizeHeader"] = PRG_SIZE_HDR[prg_size_index]
 
-  # CHR info (chr_offset seems to vary by device)
+  # chr_offset may vary by device
+  if (chr_offset is None):
+    chr_offset = (bytes[indices["outerBank"]] & 0b00001111) * 0x200000
+
   data["chrAddr"] = chr_offset + shift_left(to_16_bit(shift_right(bytes[indices["chrBank0"]], 4), bytes[indices["chrBank1"]] & 0b11111000), 10)
   data["chrAddrHex"] = f'{data["chrAddr"]:07X}'
   chr_size_index = bytes[indices["chrBank1"]] & 0b00000111
@@ -173,8 +176,7 @@ def process_retrogame_bank(bytes, args):
     return None
 
   indices = {"outerBank":0, "chrBank0":1, "chrBank1":2, "prgSize":3, "prgBank0":4, "prgBank1":5, "prgBank2":6, "prgBank3":7, "mirror": 8}
-  chr_offset = (bytes[indices["outerBank"]] & 0b00001111) * 0x200000
-  data = process_bank(bytes, indices, chr_offset)
+  data = process_bank(bytes, indices)
   return data
 
 def process_mini_arcade_bank(bytes, args):
