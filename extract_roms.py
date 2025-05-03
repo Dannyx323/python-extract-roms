@@ -114,6 +114,7 @@ def process_titles(file_handle, args):
       titles.append(title)
       if (len(titles) >= max_titles):
         break
+
   return titles
 
 def process_banks(file_handle, args):
@@ -163,12 +164,14 @@ def process_bank(bytes, indices, chr_offset = None):
   data["mirror"] = bytes[indices["mirror"]] ^ 1
   return data
 
+
 def process_retro_game_box_bank(bytes, args):
 
   indices = {"outerBank":0, "prgSize":1, "chrBank0":2, "chrBank1":3, "prgBank0":4, "prgBank1":5, "mirror": 6}
   chr_offset = (bytes[indices["outerBank"]] & 0x02) * 0x200000
   data = process_bank(bytes, indices, chr_offset)
   return data
+
 
 def process_retrogame_bank(bytes, args):
 
@@ -178,6 +181,7 @@ def process_retrogame_bank(bytes, args):
   indices = {"outerBank":0, "chrBank0":1, "chrBank1":2, "prgSize":3, "prgBank0":4, "prgBank1":5, "prgBank2":6, "prgBank3":7, "mirror": 8}
   data = process_bank(bytes, indices)
   return data
+
 
 def process_mini_arcade_bank(bytes, args):
 
@@ -221,25 +225,34 @@ def process_mini_arcade_bank(bytes, args):
   newbytes[indices["prgBank2"]] = prg_bank_2
   newbytes[indices["prgBank3"]] = prg_bank_3
 
-  chr_offset = (outer_bank & 0b00001111) * 0x200000
-  data = process_bank(newbytes, indices, chr_offset)
+  data = process_bank(newbytes, indices)
   data["oldBytes"] = bytes_to_hex(bytes)
   return data
 
-def setup_qss(file_handle, args):
 
-  # grab a chunk of 6502 that we want to execute
-  file_handle.seek(0x7E46F)
-  asm = file_handle.read(1500)
+# this is required to be called first if using process_dynamic_bank
+# args:
+#    code_addr  - the physical code address in the dump
+#    code_len   - the length of the code we're going to execute
+#    mem_addr   - the expected memory addr for the code_addr (optional, may affect JMP/JSR etc)
+#    start_addr - the memory address we want to start execution at if different than mem_addr
+def setup_emu(file_handle, args):
+
+  # grab the chunk of 6502 that we want to execute
+  file_handle.seek(args.code_addr)
+  asm = file_handle.read(args.code_len)
   mem = MMU([
-    (0x00, 0xFFFF, False, asm, 0xE46F), # create the full nes memory space to catch all writes
+    (0x00, 0xFFFF, False, asm, args.mem_addr), # create the full nes memory space to catch register writes
     # note that we'd have problems if we happened to be executing code at an address that's also a register
   ])
-  cpu = CPU(mem, 0xE8AA)
+  cpu_addr = args.mem_addr if "start_addr" not in args else args.start_addr
+  cpu = CPU(mem, cpu_addr)
   args.cpu = cpu
   args.mem = mem
   return args
 
+# this reads the title pointer data and then processes each title.
+# it must also save the bank data index so that the proper title is applied to each rom
 def process_qss_titles(file_handle, args):
 
   titles = []
@@ -256,6 +269,8 @@ def process_qss_titles(file_handle, args):
 
     val = 0x70000 + to_16_bit(hi, lo)
     pointers.append(val)
+
+    # this is how the correct title will be applied later
     args.indices.append(i)
 
     p += 1
@@ -267,17 +282,19 @@ def process_qss_titles(file_handle, args):
 
   return titles
 
-def process_qss_bank(bytes, args):
+# this processes a game's bank data by executing 6502 from the dump.
+# it then reads the resulting registers for final processing and extraction
+def process_dynamic_bank(bytes, args):
 
   # make sure we start executing from the beginning each time
-  args.cpu.r.pc = 0xE8AA
+  args.cpu.r.pc = args.start_addr
 
   # set up expected memory values
   for i, byte in enumerate(bytes):
-    args.mem.write(0x0600 + i, byte)
+    args.mem.write(args.bank_data_addr + i, byte)
 
-  # execute the code, stopping at the magic number found by printing pc
-  while (args.cpu.r.pc != 0x232):
+  # execute the code, stopping at the magic number found by printing pc until it breaks (uncomment line below)
+  while (args.cpu.r.pc != args.stop_addr):
     #print(f'{args.cpu.r.pc:04X}')
     args.cpu.step()
 
@@ -293,16 +310,16 @@ def process_qss_bank(bytes, args):
     #print('{0:04X}: {1:02X}'.format(reg, args.mem.read(reg)), end=", ")
 
   # work around bad data
-  if (newbytes[4] == 0 and newbytes[0] < 4 and newbytes[0] > 1):
+  if (args.device == "qss" and newbytes[4] == 0 and newbytes[0] < 4 and newbytes[0] > 1):
     newbytes[4] = newbytes[6] - 0x0E
     newbytes[5] = newbytes[7] - 0x0E
 
-  chr_offset = (newbytes[0] & 0b00001111) * 0x200000
-  data = process_bank(newbytes, indices, chr_offset)
+  data = process_bank(newbytes, indices)
 
   data["oldBytes"] = bytes_to_hex(bytes)
 
   return data
+
 
 def set_args(args, defaults):
 
@@ -372,11 +389,20 @@ def export():
       "banks": 0x7CE62,
       "separator": 255,
       "end": 0,
-      "size": 9
+      "size": 9,
+      # expected by setup_emu
+      "code_addr": 0x7E46F,
+      "code_len": 1500,
+      "mem_addr": 0xE46F,
+      "start_addr": 0xE8AA,
+      # expected by process_dynamic_bank
+      "bank_data_addr": 0x0600,
+      "start_addr": 0xE8AA,
+      "stop_addr": 0x232
     })
-    args.process_fn = process_qss_bank
-    args.setup_fn = setup_qss
+    args.setup_fn = setup_emu
     args.titles_fn = process_qss_titles
+    args.process_fn = process_dynamic_bank
 
   if args.filename == None:
     error += f'\nError: Filename is required!'
