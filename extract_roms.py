@@ -1,7 +1,7 @@
 # Copyright (c) gzip
 # Licensed under CC BY-NC-SA 4.0 https://creativecommons.org/licenses/by-nc-sa/4.0/deed.en
 
-import os, sys, time, argparse
+import math, os, sys, time, argparse
 
 DEBUG = False
 OUTDIR = ""
@@ -166,6 +166,55 @@ def process_retrogame_bank(bytes):
   data = process_bank(bytes, indices, chrOffset)
   return data
 
+def process_mini_arcade_bank(bytes):
+
+  if bytes[0] == 0xFF:
+    return None
+
+  newbytes = bytearray(bytes)
+
+  indices = {"prgSize":0, "chrBank0":1, "chrBank1":2, "outerBank":5,
+             "prgBank0":7, "prgBank1":8, "prgBank2":9, "prgBank3":10, "mirror": 11}
+
+  chrBank0 = math.floor(bytes[6]/64)
+  if (bytes[7] & 1):
+    chrBank0 = (chrBank0 * 2 + 1) << 4
+  else:
+    chrBank0 = chrBank0 << 4
+
+  # (%64) ASL << 2 $0206 (#$32 to =#$C8*) ORA $0311 (#$06) (=#$CE) STA $201A
+  chrBank1 = ((bytes[6] % 64) << 2) | bytes[2]
+
+  # reassign byte values
+  newbytes[indices["chrBank0"]] = chrBank0
+  newbytes[indices["chrBank1"]] = chrBank1
+
+  # (%02) (=#$00~) STA $0207  ORA $0312  STA $4100 (=#$30)
+  # (%32) STA $0205  LSR (=#$03)  ASL << 4 (=#$30~) STA $0312
+  outerBank = (((bytes[5] % 32) >> 1) << 4) | math.floor(bytes[7] / 2)
+  newbytes[indices["outerBank"]] = outerBank
+
+  # set up PRG banks
+  # mimic LSR ROR
+  prgBank0 = (0b10000000 if (bytes[5] & 1) else 0) | (bytes[4] >> 1)
+  if bytes[0] >= 5:
+    prgBank2 = prgBank0
+    prgBank1 = prgBank3 = prgBank0 + 1
+  else:
+    prgBank1 = prgBank0 + 1
+    prgBank2 = prgBank0 + 2
+    prgBank3 = prgBank0 + 3
+
+  # reassign byte values
+  newbytes[indices["prgBank0"]] = prgBank0
+  newbytes[indices["prgBank1"]] = prgBank1
+  newbytes[indices["prgBank2"]] = prgBank2
+  newbytes[indices["prgBank3"]] = prgBank3
+
+  chrOffset = (outerBank & 0b00001111) * 0x200000
+  data = process_bank(newbytes, indices, chrOffset)
+  return data
+
 def set_args(args, defaults):
 
   keys = vars(args).keys()
@@ -213,6 +262,17 @@ def export():
     })
     args.process_fn = process_retrogame_bank
 
+  elif args.device == "mini_arcade":
+    set_args(args, {
+      "titles": 0x6867E,
+      "banks": 0x6C1E0,
+      "separator": 255,
+      "end": 255,
+      "size": 12,
+      "count": 240
+    })
+    args.process_fn = process_mini_arcade_bank
+
   if args.filename == None:
     error += f'\nError: Filename is required!'
   elif not os.path.isfile(args.filename):
@@ -239,6 +299,9 @@ def export():
       os.makedirs(args.outdir)
   else:
     error += f'\nError: Outdir is required!'
+
+  if args.count == None:
+    args.count = 1000
 
   if args.outdir and args.filename and args.titles and args.banks and args.size:
     with open(args.filename, "rb") as file_handle:
@@ -273,8 +336,8 @@ def parse_args():
     parser.add_argument('-z', '--size', help='Size of each bank data entry, e.g. 9.', type=int)
     parser.add_argument('-s', '--separator', help='Character used to separate titles, e.g. 255.')
     parser.add_argument('-e', '--end', help='Character used to end titles, e.g. 0.', type=int)
-    parser.add_argument('-d', '--device', help='Device name (automatically sets values for the required arguments).', choices=["retro_game_box", "retrogame", "jl3000"])
-    parser.add_argument('-c', '--count', help='Max number of roms to parse, e.g. 10.', type=int, default=1000)
+    parser.add_argument('-d', '--device', help='Device name (automatically sets values for the required arguments).', choices=["jl3000", "mini_arcade", "retro_game_box", "retrogame"])
+    parser.add_argument('-c', '--count', help='Max number of roms to parse, e.g. 10.', type=int)
     parser.add_argument('-o', '--outdir', help='Output directory.')
     parser.add_argument('-g', '--debug', help='Enable debug output.', action='store_true')
 
