@@ -2,6 +2,8 @@
 # Licensed under CC BY-NC-SA 4.0 https://creativecommons.org/licenses/by-nc-sa/4.0/deed.en
 
 import math, os, sys, time, argparse
+from py65emu.cpu import CPU
+from py65emu.mmu import MMU
 
 DEBUG = False
 
@@ -86,7 +88,11 @@ def write_rom(file_handle, title, bank, outdir):
     if modified_bytes:
       print ("    " + bank["bytes"])
 
-def process_titles(file_handle, separator, end, max_titles):
+def process_titles(file_handle, args):
+
+  separator = args.separator
+  end = args.end
+  max_titles = args.count
 
   title_len = 0
   titles = []
@@ -109,13 +115,13 @@ def process_titles(file_handle, separator, end, max_titles):
         break
   return titles
 
-def process_banks(file_handle, fn, size, count):
+def process_banks(file_handle, args):
 
   data = []
 
-  while (len(data) < count):
-    bytes = file_handle.read(size)
-    info = fn(bytes)
+  while (len(data) < args.count):
+    bytes = file_handle.read(args.size)
+    info = args.process_fn(bytes, args)
     if info:
       data.append(info)
     else:
@@ -153,14 +159,14 @@ def process_bank(bytes, indices, chr_offset):
   data["mirror"] = bytes[indices["mirror"]] ^ 1
   return data
 
-def process_retro_game_box_bank(bytes):
+def process_retro_game_box_bank(bytes, args):
 
   indices = {"outerBank":0, "prgSize":1, "chrBank0":2, "chrBank1":3, "prgBank0":4, "prgBank1":5, "mirror": 6}
   chr_offset = (bytes[indices["outerBank"]] & 0x02) * 0x200000
   data = process_bank(bytes, indices, chr_offset)
   return data
 
-def process_retrogame_bank(bytes):
+def process_retrogame_bank(bytes, args):
 
   if bytes[0] == 0xFF:
     return None
@@ -170,7 +176,7 @@ def process_retrogame_bank(bytes):
   data = process_bank(bytes, indices, chr_offset)
   return data
 
-def process_mini_arcade_bank(bytes):
+def process_mini_arcade_bank(bytes, args):
 
   newbytes = bytearray(bytes)
 
@@ -217,6 +223,84 @@ def process_mini_arcade_bank(bytes):
   data["oldBytes"] = bytes_to_hex(bytes)
   return data
 
+def setup_qss(file_handle, args):
+
+  # grab a chunk of 6502 that we want to execute
+  file_handle.seek(0x7E46F)
+  asm = file_handle.read(1500)
+  mem = MMU([
+    (0x00, 0xFFFF, False, asm, 0xE46F), # create the full nes memory space to catch all writes
+    # note that we'd have problems if we happened to be executing code at an address that's also a register
+  ])
+  cpu = CPU(mem, 0xE8AA)
+  args.cpu = cpu
+  args.mem = mem
+  return args
+
+def process_qss_titles(file_handle, args):
+
+  titles = []
+  pointers = []
+  args.indices = []
+  p = 0
+
+  file_handle.seek(0x7C13A)
+  while (p < 240):
+    lo = int.from_bytes(file_handle.read(1))
+    hi = int.from_bytes(file_handle.read(1))
+    i  = int.from_bytes(file_handle.read(1))
+    file_handle.read(1) # discard the last byte which is always 0
+
+    val = 0x70000 + to_16_bit(hi, lo)
+    pointers.append(val)
+    args.indices.append(i)
+
+    p += 1
+
+  args.count = 1
+  for pointer in pointers:
+    file_handle.seek(pointer)
+    titles.extend(process_titles(file_handle, args))
+
+  return titles
+
+def process_qss_bank(bytes, args):
+
+  # make sure we start executing from the beginning each time
+  args.cpu.r.pc = 0xE8AA
+
+  # set up expected memory values
+  for i, byte in enumerate(bytes):
+    args.mem.write(0x0600 + i, byte)
+
+  # execute the code, stopping at the magic number found by printing pc
+  while (args.cpu.r.pc != 0x232):
+    #print(f'{args.cpu.r.pc:04X}')
+    args.cpu.step()
+
+  indices = {
+    "outerBank":0, "chrBank0":1, "chrBank1":2,
+    "prgSize":3, "prgBank0":4, "prgBank1":5, "prgBank2":6, "prgBank3":7,
+    "mirror": 8
+  }
+
+  newbytes = bytearray()
+  for reg in [0x4100, 0x2018, 0x201A, 0x410B, 0x4107, 0x4108, 0x4109, 0x410A, 0xA000]:
+    newbytes.append(args.mem.read(reg))
+    #print('{0:04X}: {1:02X}'.format(reg, args.mem.read(reg)), end=", ")
+
+  # work around bad data
+  if (newbytes[4] == 0 and newbytes[0] < 4 and newbytes[0] > 1):
+    newbytes[4] = newbytes[6] - 0x0E
+    newbytes[5] = newbytes[7] - 0x0E
+
+  chr_offset = (newbytes[0] & 0b00001111) * 0x200000
+  data = process_bank(newbytes, indices, chr_offset)
+
+  data["oldBytes"] = bytes_to_hex(bytes)
+
+  return data
+
 def set_args(args, defaults):
 
   keys = vars(args).keys()
@@ -232,6 +316,10 @@ def export():
 
   if args.debug:
     globals()['DEBUG'] = True
+
+  args.process_fn = None
+  args.titles_fn = process_titles
+  args.banks_fn = process_banks
 
   if args.device == "retro_game_box":
     set_args(args, {
@@ -275,6 +363,18 @@ def export():
     })
     args.process_fn = process_mini_arcade_bank
 
+  elif args.device == "qss":
+    set_args(args, {
+      "titles": 0x7C506,
+      "banks": 0x7CE62,
+      "separator": 255,
+      "end": 0,
+      "size": 9
+    })
+    args.process_fn = process_qss_bank
+    args.setup_fn = setup_qss
+    args.titles_fn = process_qss_titles
+
   if args.filename == None:
     error += f'\nError: Filename is required!'
   elif not os.path.isfile(args.filename):
@@ -308,14 +408,19 @@ def export():
   if args.outdir and args.filename and args.titles and args.banks and args.size:
     with open(args.filename, "rb") as file_handle:
 
+      if ("setup_fn" in args):
+        args.setup_fn(file_handle, args)
+
       file_handle.seek(args.titles)
-      titles = process_titles(file_handle, args.separator, args.end, args.count)
+      titles = args.titles_fn(file_handle, args)
 
+      args.count = len(titles)
       file_handle.seek(args.banks)
-      banks = process_banks(file_handle, args.process_fn, args.size, len(titles))
+      banks = args.banks_fn(file_handle, args)
 
-      for b in range(len(banks)):
-        write_rom(file_handle, titles[b], banks[b], args.outdir)
+      for i in range(len(titles)):
+        bankIndex = i if "indices" not in args else args.indices[i]
+        write_rom(file_handle, titles[i], banks[bankIndex], args.outdir)
 
   else:
     print ('\n')
@@ -338,7 +443,7 @@ def parse_args():
     parser.add_argument('-z', '--size', help='Size of each bank data entry, e.g. 9.', type=int)
     parser.add_argument('-s', '--separator', help='Character used to separate titles, e.g. 255.')
     parser.add_argument('-e', '--end', help='Character used to end titles, e.g. 0.', type=int)
-    parser.add_argument('-d', '--device', help='Device name (automatically sets values for the required arguments).', choices=["jl3000", "mini_arcade", "retro_game_box", "retrogame"])
+    parser.add_argument('-d', '--device', help='Device name (automatically sets values for the required arguments).', choices=["jl3000", "mini_arcade", "retro_game_box", "retrogame", "qss"])
     parser.add_argument('-c', '--count', help='Max number of roms to parse, e.g. 10.', type=int)
     parser.add_argument('-o', '--outdir', help='Output directory.')
     parser.add_argument('-g', '--debug', help='Enable debug output.', action='store_true')
