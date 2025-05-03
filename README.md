@@ -4,30 +4,16 @@ A command line utility to extract the roms from firmware dumps of various handhe
 ## Supported Devices
 The following devices are currently supported:
 
-### Gaminja GC31 / Gameruns Retrogame ([on nesdev](https://forums.nesdev.org/viewtopic.php?p=298744#p298744))
-![](images/gaminja_gc31.jpg)
-
----
-
-### Gaminja GC36 / Gameruns Retro Game Box ([on nesdev](https://forums.nesdev.org/viewtopic.php?p=298602#p298602))
-![](images/gaminja_gc36.jpg)
-
----
-
-### Lexibook JL3000 Power Cyber Arcade ([on nesdev](https://forums.nesdev.org/viewtopic.php?p=265765&hilit=dump#p265765))
-![](images/lexibook_jl3000.jpg)
-
----
-
-### Thumbs Up Orb Retro Arcade ([on nesdev](https://forums.nesdev.org/viewtopic.php?p=284160#p284160))
-![](images/thumbs_up_orb_mini_arcade.jpg)
-
----
-
-### QSS Retro Arcade ([on nesdev](https://forums.nesdev.org/viewtopic.php?p=300556#p300556))
-![](images/qss_retro_arcade.jpg)
+| Name | Photo | Link |
+| --- | --- | --- |
+| Gaminja GC31 / Gameruns Retrogame | <img src="images/gaminja_gc31.jpg" alt="Gaminja GC31 Handheld Console" width="200" height="200"> | ([on nesdev](https://forums.nesdev.org/viewtopic.php?p=298744#p298744)) |
+| Gaminja GC36 | <img src="images/gaminja_gc36.jpg" alt="Photo of GC36 Handheld Console" width="200" height="200"> | ([on nesdev](https://forums.nesdev.org/viewtopic.php?p=298602#p298602)) |
+| Lexibook JL3000 Power Cyber Arcade | <img src="images/lexibook_jl3000.jpg" alt="Photo of Lexibook JL3000 Handheld Console" width="200" height="200"> | ([on nesdev](https://forums.nesdev.org/viewtopic.php?p=265765&hilit=dump#p265765)) |
+| Thumbs Up Orb Retro Arcade | <img src="images/thumbs_up_orb_mini_arcade.jpg" alt="Photo of Thumbs Up Orb Retro Arcade Handheld Console" width="200" height="200"> | ([on nesdev](https://forums.nesdev.org/viewtopic.php?p=284160#p284160)) |
+| QSS Retro Arcade | <img src="images/qss_retro_arcade.jpg" alt="Photo of QSS Retro Arcade Handheld Console" width="200" height="200"> | ([on nesdev](https://forums.nesdev.org/viewtopic.php?p=300556#p300556)) |
 
 ## Running the Script
+Examples of typical execution:
 ```
 python extract_roms.py -f "retro_game_box.bin" -d retro_game_box -o dump\retro_game_box -g
 python extract_roms.py -f "jl3000.bin" -d jl3000 -o dump\jl3000 -g
@@ -40,8 +26,8 @@ python extract_roms.py -f "qss.bin" -d qss -o dump\qss -g
 
 The -g option outputs additional information that can be used to _manually replace_ one of the existing roms in your dump.
 
-1. Find a rom in the output that matches the same PRG and CHR size as the rom you'd like to replace it with.
-2. Use a utility like [famiROM](https://gbatemp.net/download/famirom-2019-01-13.37661/download) to split up the new rom into separate chunks of PRG and CHR data.
+1. Find an existing rom in the output that matches the same PRG and CHR size as the rom you'd like to replace it with.
+2. Use a utility like [famiROM](https://gbatemp.net/download/famirom-2019-01-13.37661/download) or [NES Rom Splitter](https://www.romhacking.net/utilities/683/) to split up the new rom into separate chunks of PRG and CHR data.
 3. Then use a hex editor like [HxD](https://mh-nexus.de/en/downloads.php?product=HxD20) to paste the respective chunks in the firmware dump at the hex addresses given with the -g option, overwriting the existing data.
 4. Locate the title with a text search and replace it with the title of your new rom, making sure not to overflow the provided title space.
 
