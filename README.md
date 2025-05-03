@@ -37,10 +37,17 @@ extracting dump\qss\Vangvard.nes (mapper 4) from data:
     02 60 81 02 10 11 1E 1F 00
 ```
 
+## Dumping and Programming Firmware
+The most friendly firmware are on 8-pin serial flash memory chips, often from Winbond. These are relatively easy to dump using the inexpensive CH341A programmer. You also want the test clip to go along with it or specialty test hooks for SMD components. Other larger NAND flash chips are also common but are much more complicated to dump.
+
+| Description | Photo |
+| --- | --- |
+| CH341A programmer with test clip | <img src="images/CH341A.jpg" alt="Photo of the programmer and test clip" width="200" height="200"> |
+| Typical flash chip | <img src="images/winbond.jpg" alt="Photo of the flash chip" width="200" height="200"> |
 
 ## New Devices
 
-Generally code change is going to be required to support a new device, but if a new device happens to use the same data formats as one of the supported devices, then you can pass that device name and override the data addresses using the various command line options.
+Generally code change is going to be required to support a new device, but if the device happens to use the same data formats as one of the supported devices, then you can pass that device name and override the data addresses using the various command line options.
 
 ```
 >python extract_roms.py
