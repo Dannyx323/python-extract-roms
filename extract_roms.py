@@ -183,53 +183,6 @@ def process_retrogame_bank(bytes, args):
   return data
 
 
-def process_mini_arcade_bank(bytes, args):
-
-  newbytes = bytearray(bytes)
-
-  indices = {"prgSize":0, "chrBank0":1, "chrBank1":2, "outerBank":5,
-             "prgBank0":7, "prgBank1":8, "prgBank2":9, "prgBank3":10, "mirror": 11}
-
-  chr_bank_0 = math.floor(bytes[6]/64)
-  if (bytes[7] & 1):
-    chr_bank_0 = (chr_bank_0 * 2 + 1) << 4
-  else:
-    chr_bank_0 = chr_bank_0 << 4
-
-  # (%64) ASL << 2  ORA $0311  STA $201A
-  chr_bank_1 = ((bytes[6] % 64) << 2) | bytes[2]
-
-  # reassign byte values
-  newbytes[indices["chrBank0"]] = chr_bank_0
-  newbytes[indices["chrBank1"]] = chr_bank_1
-
-  # (/02) ORA $0312  STA $4100
-  # (%32) LSR  ASL << 4  STA $0312
-  outer_bank = (((bytes[5] % 32) >> 1) << 4) | math.floor(bytes[7] / 2)
-  newbytes[indices["outerBank"]] = outer_bank
-
-  # set up PRG banks
-  # LSR  ROR
-  prg_bank_0 = (0b10000000 if (bytes[5] & 1) else 0) | (bytes[4] >> 1)
-  if bytes[0] >= 5:
-    prg_bank_2 = prg_bank_0
-    prg_bank_1 = prg_bank_3 = prg_bank_0 + 1
-  else:
-    prg_bank_1 = prg_bank_0 + 1
-    prg_bank_2 = prg_bank_0 + 2
-    prg_bank_3 = prg_bank_0 + 3
-
-  # reassign byte values
-  newbytes[indices["prgBank0"]] = prg_bank_0
-  newbytes[indices["prgBank1"]] = prg_bank_1
-  newbytes[indices["prgBank2"]] = prg_bank_2
-  newbytes[indices["prgBank3"]] = prg_bank_3
-
-  data = process_bank(newbytes, indices)
-  data["oldBytes"] = bytes_to_hex(bytes)
-  return data
-
-
 # this is required to be called first if using process_dynamic_bank
 # args:
 #    code_addr  - the physical code address in the dump
@@ -379,9 +332,18 @@ def export():
       "separator": 255,
       "end": 255,
       "size": 12,
-      "count": 240
+      "count": 240,
+      # expected by setup_emu
+      "code_addr": 0x7E899,
+      "code_len": 200,
+      "mem_addr": 0x020D,
+      # expected by process_dynamic_bank
+      "bank_data_addr": 0x0200,
+      "start_addr": 0x020D,
+      "stop_addr": 0x2D5
     })
-    args.process_fn = process_mini_arcade_bank
+    args.setup_fn = setup_emu
+    args.process_fn = process_dynamic_bank
 
   elif args.device == "qss":
     set_args(args, {
