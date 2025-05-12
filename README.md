@@ -7,7 +7,8 @@ The following devices are currently supported:
 | Name | Photo | Link |
 | --- | --- | --- |
 | Gaminja GC31 / Gameruns Retrogame | <img src="images/gaminja_gc31.jpg" alt="Gaminja GC31 Handheld Console" width="200" height="200"> | ([on nesdev](https://forums.nesdev.org/viewtopic.php?p=298744#p298744)) |
-| Gaminja GC36 | <img src="images/gaminja_gc36.jpg" alt="Photo of GC36 Handheld Console" width="200" height="200"> | ([on nesdev](https://forums.nesdev.org/viewtopic.php?p=298602#p298602)) |
+| Gaminja GC36 / Gameruns Retro Game Box | <img src="images/gaminja_gc36.jpg" alt="Photo of GC36 Handheld Console" width="200" height="200"> | ([on nesdev](https://forums.nesdev.org/viewtopic.php?p=298602#p298602)) |
+| HKB-502 | <img src="images/hkb-502.jpg" alt="Photo of GC36 Handheld Console" width="200" height="200"> | ([on nesdev](https://forums.nesdev.org/viewtopic.php?p=252679#p252679)) |
 | Lexibook JL3000 Power Cyber Arcade | <img src="images/lexibook_jl3000.jpg" alt="Photo of Lexibook JL3000 Handheld Console" width="200" height="200"> | ([on nesdev](https://forums.nesdev.org/viewtopic.php?p=265765&hilit=dump#p265765)) |
 | Thumbs Up Orb Retro Arcade | <img src="images/thumbs_up_orb_mini_arcade.jpg" alt="Photo of Thumbs Up Orb Retro Arcade Handheld Console" width="200" height="200"> | ([on nesdev](https://forums.nesdev.org/viewtopic.php?p=284160#p284160)) |
 | QSS Retro Arcade | <img src="images/qss_retro_arcade.jpg" alt="Photo of QSS Retro Arcade Handheld Console" width="200" height="200"> | ([on nesdev](https://forums.nesdev.org/viewtopic.php?p=300556#p300556)) |
@@ -15,10 +16,11 @@ The following devices are currently supported:
 ## Running the Script
 Examples of typical execution:
 ```
-python extract_roms.py -f "retro_game_box.bin" -d retro_game_box -o dump\retro_game_box -g
+python extract_roms.py -f "hkb-502.bin" -d hkb-502 -o dump\hkb-502 -g
 python extract_roms.py -f "jl3000.bin" -d jl3000 -o dump\jl3000 -g
-python extract_roms.py -f "retrogame" -d retrogame -o dump\retrogame -g
 python extract_roms.py -f "mini_arcade.bin" -d mini_arcade -o dump\mini_arcade -g
+python extract_roms.py -f "retro_game_box.bin" -d retro_game_box -o dump\retro_game_box -g
+python extract_roms.py -f "retrogame" -d retrogame -o dump\retrogame -g
 python extract_roms.py -f "qss.bin" -d qss -o dump\qss -g
 ```
 
@@ -38,7 +40,7 @@ extracting dump\qss\Vangvard.nes (mapper 4) from data:
 ```
 
 ## Dumping and Programming Firmware
-The most friendly firmware are on 8-pin serial flash memory chips, often from Winbond. These are relatively easy to dump using the inexpensive CH341A programmer. You also want the test clip to go along with it or specialty test hooks for SMD components. Other larger NAND flash chips are also common but are much more complicated to dump.
+The most friendly firmwares are on 8-pin serial flash memory chips, often from Winbond. These are relatively easy to dump using the inexpensive CH341A programmer. You'll also need a test clip to go along with it, or specialty test hooks for SMD components. Larger NAND flash chips are also common but are much more complicated to dump.
 
 | Description | Photo |
 | --- | --- |
@@ -47,7 +49,7 @@ The most friendly firmware are on 8-pin serial flash memory chips, often from Wi
 
 ## New Devices
 
-Generally code change is going to be required to support a new device, but if the device happens to use the same data formats as one of the supported devices, then you can pass that device name and override the data addresses using the various command line options.
+Generally, code change is going to be required to support a new device, but if the device happens to use the same data formats as one of the already supported devices, then you can pass that device name and override the data addresses using the various command line options.
 
 ```
 >python extract_roms.py

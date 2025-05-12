@@ -255,6 +255,21 @@ def process_qss_titles(file_handle, args):
 
   return titles
 
+# this reads the bank index data
+def setup_retrogame(file_handle, args):
+
+  p = 0
+  args.indices = []
+
+  file_handle.seek(0x7B800)
+  while (p < args.count):
+    i  = int.from_bytes(file_handle.read(1))
+    file_handle.read(3) # skip next 3 bytes (2 byte address plus 1 byte value)
+
+    # associate the correct title with the corresponding bank data
+    args.indices.append(i)
+    p += 1
+
 def process_retro_game_box_bank(bytes, args):
 
   indices = {"outerBank":0, "prgSize":1, "chrBank0":2, "chrBank1":3, "prgBank0":4, "prgBank1":5, "mirror": 6}
@@ -311,6 +326,19 @@ def export():
       "size": 9,
       "count": 128
     })
+    args.setup_fn = setup_retrogame
+    args.process_fn = process_retrogame_bank
+
+  elif args.device == "hkb_502":
+    set_args(args, {
+      "titles": 0x7C010,
+      "banks": 0x7B000,
+      "separator": 0,
+      "end": 255,
+      "size": 9,
+      "count": 268
+    })
+    args.setup_fn = setup_retrogame
     args.process_fn = process_retrogame_bank
 
   elif args.device == "jl3000":
@@ -433,7 +461,7 @@ def parse_args():
     parser.add_argument('-z', '--size', help='Size of each bank data entry, e.g. 9.', type=int)
     parser.add_argument('-s', '--separator', help='Character used to separate titles, e.g. 255.')
     parser.add_argument('-e', '--end', help='Character used to end titles, e.g. 0.', type=int)
-    parser.add_argument('-d', '--device', help='Device name (automatically sets values for the required arguments).', choices=["jl3000", "mini_arcade", "retro_game_box", "retrogame", "qss"])
+    parser.add_argument('-d', '--device', help='Device name (automatically sets values for the required arguments).', choices=["hkb_502", "jl3000", "mini_arcade", "retro_game_box", "retrogame", "qss"])
     parser.add_argument('-c', '--count', help='Max number of roms to parse, e.g. 10.', type=int)
     parser.add_argument('-o', '--outdir', help='Output directory.')
     parser.add_argument('-g', '--debug', help='Enable debug output.', action='store_true')
