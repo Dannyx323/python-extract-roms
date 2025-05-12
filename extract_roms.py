@@ -190,7 +190,7 @@ def setup_emu(file_handle, args):
 def process_dynamic_bank(bytes, args):
 
   # make sure we start executing from the beginning each time
-  args.cpu.r.pc = args.start_addr
+  args.cpu.r.pc = args.mem_addr if "start_addr" not in args else args.start_addr
 
   # set up expected memory values
   for i, byte in enumerate(bytes):
@@ -226,21 +226,21 @@ def process_dynamic_bank(bytes, args):
 
 # this reads the title pointer data and then processes each title.
 # it must also save the bank data index so that the proper title is applied to each rom
-def process_qss_titles(file_handle, args):
+def process_indexed_titles(file_handle, args):
 
   titles = []
   pointers = []
   args.indices = []
   p = 0
 
-  file_handle.seek(0x7C13A)
-  while (p < 240):
+  file_handle.seek(args.indices_addr)
+  while (p < args.count):
     lo = int.from_bytes(file_handle.read(1))
     hi = int.from_bytes(file_handle.read(1))
     i  = int.from_bytes(file_handle.read(1))
     file_handle.read(1) # discard the last byte which is always 0
 
-    val = 0x70000 + to_16_bit(hi, lo)
+    val = args.titles_offset + to_16_bit(hi, lo)
     pointers.append(val)
 
     # this is how the correct title will be applied later
@@ -365,7 +365,6 @@ def export():
       "mem_addr": 0x020D,
       # expected by process_dynamic_bank
       "bank_data_addr": 0x0200,
-      "start_addr": 0x020D,
       "stop_addr": 0x2D5
     })
     args.setup_fn = setup_emu
@@ -382,14 +381,17 @@ def export():
       "code_addr": 0x7E46F,
       "code_len": 1500,
       "mem_addr": 0xE46F,
-      "start_addr": 0xE8AA,
       # expected by process_dynamic_bank
       "bank_data_addr": 0x0600,
       "start_addr": 0xE8AA,
-      "stop_addr": 0x232
+      "stop_addr": 0x232,
+      # expected by process_indexed_titles
+      "indices_addr": 0x7C13A,
+      "titles_offset": 0x70000,
+      "count": 240
     })
     args.setup_fn = setup_emu
-    args.titles_fn = process_qss_titles
+    args.titles_fn = process_indexed_titles
     args.process_fn = process_dynamic_bank
 
   if args.filename == None:
