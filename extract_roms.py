@@ -407,8 +407,9 @@ def export():
       file_handle.seek(args.banks)
       banks = args.banks_fn(file_handle, args)
 
-      for i in range(len(titles)):
+      for i in range(min(len(titles), len(banks))):
         bankIndex = i if "indices" not in args else args.indices[i]
+        print (f'{i+1:03n}. ', end = '')
         write_rom(file_handle, titles[i], banks[bankIndex], args.outdir)
 
   else:
