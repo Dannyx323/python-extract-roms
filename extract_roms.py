@@ -175,6 +175,7 @@ def setup_emu(file_handle, args):
   # grab the chunk of 6502 that we want to execute
   file_handle.seek(args.code_addr)
   asm = file_handle.read(args.code_len)
+  #print(bytes_to_hex(asm))
   mem = MMU([
     (0x00, 0xFFFF, False, asm, args.mem_addr), # create the full nes memory space to catch register writes
     # note that we'd have problems if we happened to be executing code at an address that's also a register
@@ -196,7 +197,9 @@ def process_dynamic_bank(bytes, args):
   for i, byte in enumerate(bytes):
     args.mem.write(args.bank_data_addr + i, byte)
 
-  # execute the code, stopping at the magic number found by printing pc until it breaks (uncomment line below)
+  # execute the code, stopping at the magic number found by debugging,
+  # or by printing pc until it breaks (uncomment the print line below)
+  # stop_addr must point to an instruction
   while (args.cpu.r.pc != args.stop_addr):
     #print(f'{args.cpu.r.pc:04X}')
     args.cpu.step()
@@ -216,6 +219,9 @@ def process_dynamic_bank(bytes, args):
   if (args.device == "qss" and newbytes[4] == 0 and newbytes[0] < 4 and newbytes[0] > 1):
     newbytes[4] = newbytes[6] - 0x0E
     newbytes[5] = newbytes[7] - 0x0E
+  # set mirror
+  elif (args.device == "oplayer"):
+    newbytes[8] = bytes[0x0B]
 
   data = process_bank(newbytes, indices)
 
@@ -394,6 +400,29 @@ def export():
     args.titles_fn = process_indexed_titles
     args.process_fn = process_dynamic_bank
 
+  elif args.device == "oplayer":
+    set_args(args, {
+      "titles": 0x6CB2F,
+      "banks": 0x6D2E5,
+      "separator": 255,
+      "end": 0,
+      "size": 0x0C,
+      # expected by setup_emu
+      "code_addr": 0x7E372,
+      "code_len": 0xE5,
+      "mem_addr": 0x0410,
+      # expected by process_dynamic_bank
+      "bank_data_addr": 0x0400,
+      "stop_addr": 0x04F4,
+      # expected by process_indexed_titles
+      "indices_addr": 0x6C8D5,
+      "titles_offset": 0x64000,
+      "count": 150
+    })
+    args.setup_fn = setup_emu
+    args.titles_fn = process_indexed_titles
+    args.process_fn = process_dynamic_bank
+
   if args.filename == None:
     error += f'\nError: Filename is required!'
   elif not os.path.isfile(args.filename):
@@ -463,7 +492,7 @@ def parse_args():
     parser.add_argument('-z', '--size', help='Size of each bank data entry, e.g. 9.', type=int)
     parser.add_argument('-s', '--separator', help='Character used to separate titles, e.g. 255.')
     parser.add_argument('-e', '--end', help='Character used to end titles, e.g. 0.', type=int)
-    parser.add_argument('-d', '--device', help='Device name (automatically sets values for the required arguments).', choices=["hkb_502", "jl3000", "mini_arcade", "retro_game_box", "retrogame", "qss"])
+    parser.add_argument('-d', '--device', help='Device name (automatically sets values for the required arguments).', choices=["hkb_502", "jl3000", "mini_arcade", "oplayer", "qss", "retro_game_box", "retrogame"])
     parser.add_argument('-c', '--count', help='Max number of roms to parse, e.g. 10.', type=int)
     parser.add_argument('-o', '--outdir', help='Output directory.')
     parser.add_argument('-g', '--debug', help='Enable debug output.', action='store_true')
