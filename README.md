@@ -43,6 +43,16 @@ extracting dump\qss\Vangvard.nes (mapper 4) from data:
     02 60 81 02 10 11 1E 1F 00
 ```
 
+## Testing Modifications
+
+The raw dumps require an ines header to be added in order to run in [NintendulatorNRS](https://unlicensed.games/libg/static.php?page=NintendulatorNRS). Here are a few headers that may work with the various dumps.
+
+```
+4E 45 53 1A 00 00 00 0B 01 01 07 00 00 0A 00 00 (4MB dump, mapper 256)
+4E 45 53 1A 00 00 00 0B 01 02 07 00 00 0A 00 00 (8MB dump, mapper 256)
+4E 45 53 1A 00 00 B0 AB 01 04 07 00 01 0A 00 00 (16MB dump, mapper 427)
+```
+
 ## Dumping and Programming Firmware
 The most friendly firmwares are on 8-pin serial flash memory chips, often from Winbond. These are relatively easy to dump using the inexpensive CH341A programmer. You'll also need a test clip to go along with it, or specialty test hooks for SMD components. Larger NAND flash chips are also common but are much more complicated to dump.
 
