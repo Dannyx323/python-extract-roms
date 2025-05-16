@@ -6,14 +6,14 @@ The following devices are currently supported:
 
 | Name | Photo | Link |
 | --- | --- | --- |
-| Arcade Zone | <img src="images/arcade_zone.jpg" alt="Photo of Arcade Zone by Legami Milano" width="200" height="200"> | ([on nesdev](https://forums.nesdev.org/viewtopic.php?p=301774#p301774)) |
-| Gaminja GC31 / Gameruns Retrogame | <img src="images/gaminja_gc31.jpg" alt="Gaminja GC31 Handheld Console" width="200" height="200"> | ([on nesdev](https://forums.nesdev.org/viewtopic.php?p=298744#p298744)) |
-| Gaminja GC36 / Gameruns Retro Game Box | <img src="images/gaminja_gc36.jpg" alt="Photo of GC36 Handheld Console" width="200" height="200"> | ([on nesdev](https://forums.nesdev.org/viewtopic.php?p=298602#p298602)) |
-| HKB-502 | <img src="images/hkb-502.jpg" alt="Photo of HKB-502 Handheld Console" width="200" height="200"> | ([on nesdev](https://forums.nesdev.org/viewtopic.php?p=252679#p252679)) |
-| Lexibook JL3000 Power Cyber Arcade | <img src="images/lexibook_jl3000.jpg" alt="Photo of Lexibook JL3000 Handheld Console" width="200" height="200"> | ([on nesdev](https://forums.nesdev.org/viewtopic.php?p=265765&hilit=dump#p265765)) |
-| Oplayer MGS2401A | <img src="images/oplayer.jpg" alt="Photo of Oplayer MGS2401A Handheld Console" width="200" height="200"> | ([on nesdev](https://forums.nesdev.org/viewtopic.php?p=257743#p257743)) |
-| Thumbs Up Orb Retro Arcade | <img src="images/thumbs_up_orb_mini_arcade.jpg" alt="Photo of Thumbs Up Orb Retro Arcade Handheld Console" width="200" height="200"> | ([on nesdev](https://forums.nesdev.org/viewtopic.php?p=284160#p284160)) |
-| QSS Retro Arcade | <img src="images/qss_retro_arcade.jpg" alt="Photo of QSS Retro Arcade Handheld Console" width="200" height="200"> | ([on nesdev](https://forums.nesdev.org/viewtopic.php?p=300556#p300556)) |
+| Arcade Zone | <img src="images/arcade_zone.jpg" alt="Photo of Arcade Zone by Legami Milano" width="200"> | ([on nesdev](https://forums.nesdev.org/viewtopic.php?p=301774#p301774)) |
+| Gaminja GC31 / Gameruns Retrogame | <img src="images/gaminja_gc31.jpg" alt="Gaminja GC31 Handheld Console" width="200"> | ([on nesdev](https://forums.nesdev.org/viewtopic.php?p=298744#p298744)) |
+| Gaminja GC36 / Gameruns Retro Game Box | <img src="images/gaminja_gc36.jpg" alt="Photo of GC36 Handheld Console" width="200"> | ([on nesdev](https://forums.nesdev.org/viewtopic.php?p=298602#p298602)) |
+| HKB-502 | <img src="images/hkb-502.jpg" alt="Photo of HKB-502 Handheld Console" width="200"> | ([on nesdev](https://forums.nesdev.org/viewtopic.php?p=252679#p252679)) |
+| Lexibook JL3000 Power Cyber Arcade | <img src="images/lexibook_jl3000.jpg" alt="Photo of Lexibook JL3000 Handheld Console" width="200"> | ([on nesdev](https://forums.nesdev.org/viewtopic.php?p=265765&hilit=dump#p265765)) |
+| Oplayer MGS2401A | <img src="images/oplayer.jpg" alt="Photo of Oplayer MGS2401A Handheld Console" width="200"> | ([on nesdev](https://forums.nesdev.org/viewtopic.php?p=257743#p257743)) |
+| Thumbs Up Orb Retro Arcade | <img src="images/thumbs_up_orb_mini_arcade.jpg" alt="Photo of Thumbs Up Orb Retro Arcade Handheld Console" width="200"> | ([on nesdev](https://forums.nesdev.org/viewtopic.php?p=284160#p284160)) |
+| QSS Retro Arcade | <img src="images/qss_retro_arcade.jpg" alt="Photo of QSS Retro Arcade Handheld Console" width="200"> | ([on nesdev](https://forums.nesdev.org/viewtopic.php?p=300556#p300556)) |
 
 ## Running the Script
 Examples of typical execution:
@@ -58,8 +58,8 @@ The most friendly firmwares are on 8-pin serial flash memory chips, often from W
 
 | Description | Photo |
 | --- | --- |
-| CH341A programmer with test clip | <img src="images/CH341A.jpg" alt="Photo of the programmer and test clip" width="200" height="200"> |
-| Typical flash chip | <img src="images/winbond.jpg" alt="Photo of the flash chip" width="200" height="200"> |
+| CH341A programmer with test clip | <img src="images/CH341A.jpg" alt="Photo of the programmer and test clip" width="200"> |
+| Typical flash chip | <img src="images/winbond.jpg" alt="Photo of the flash chip" width="200"> |
 
 ## New Devices
 
