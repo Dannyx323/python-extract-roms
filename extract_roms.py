@@ -215,13 +215,14 @@ def process_dynamic_bank(bytes, args):
     newbytes.append(args.mem.read(reg))
     #print('{0:04X}: {1:02X}'.format(reg, args.mem.read(reg)), end=", ")
 
+  # set mirror
+  if "mirror_byte" in args:
+    newbytes[8] = bytes[args.mirror_byte]
+
   # work around bad data
   if (args.device == "qss" and newbytes[4] == 0 and newbytes[0] < 4 and newbytes[0] > 1):
     newbytes[4] = newbytes[6] - 0x0E
     newbytes[5] = newbytes[7] - 0x0E
-  # set mirror
-  elif (args.device == "oplayer"):
-    newbytes[8] = bytes[0x0B]
 
   data = process_bank(newbytes, indices)
 
@@ -371,7 +372,29 @@ def export():
       "mem_addr": 0x020D,
       # expected by process_dynamic_bank
       "bank_data_addr": 0x0200,
-      "stop_addr": 0x2D5
+      "stop_addr": 0x2D5,
+      "mirror_byte": 0x0B
+    })
+    args.setup_fn = setup_emu
+    args.process_fn = process_dynamic_bank
+
+  # identical to mini_arcade except for code_addr
+  elif args.device == "arcade_zone":
+    set_args(args, {
+      "titles": 0x6867E,
+      "banks": 0x6C1E0,
+      "separator": 255,
+      "end": 255,
+      "size": 12,
+      "count": 240,
+      # expected by setup_emu
+      "code_addr": 0x7E88F,
+      "code_len": 200,
+      "mem_addr": 0x020D,
+      # expected by process_dynamic_bank
+      "bank_data_addr": 0x0200,
+      "stop_addr": 0x2D5,
+      "mirror_byte": 0x0B
     })
     args.setup_fn = setup_emu
     args.process_fn = process_dynamic_bank
@@ -414,6 +437,7 @@ def export():
       # expected by process_dynamic_bank
       "bank_data_addr": 0x0400,
       "stop_addr": 0x04F4,
+      "mirror_byte": 0x0B,
       # expected by process_indexed_titles
       "indices_addr": 0x6C8D5,
       "titles_offset": 0x64000,
@@ -492,7 +516,7 @@ def parse_args():
     parser.add_argument('-z', '--size', help='Size of each bank data entry, e.g. 9.', type=int)
     parser.add_argument('-s', '--separator', help='Character used to separate titles, e.g. 255.')
     parser.add_argument('-e', '--end', help='Character used to end titles, e.g. 0.', type=int)
-    parser.add_argument('-d', '--device', help='Device name (automatically sets values for the required arguments).', choices=["hkb_502", "jl3000", "mini_arcade", "oplayer", "qss", "retro_game_box", "retrogame"])
+    parser.add_argument('-d', '--device', help='Device name (automatically sets values for the required arguments).', choices=["arcade_zone", "hkb_502", "jl3000", "mini_arcade", "oplayer", "qss", "retro_game_box", "retrogame"])
     parser.add_argument('-c', '--count', help='Max number of roms to parse, e.g. 10.', type=int)
     parser.add_argument('-o', '--outdir', help='Output directory.')
     parser.add_argument('-g', '--debug', help='Enable debug output.', action='store_true')
