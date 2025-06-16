@@ -94,9 +94,11 @@ class CPU:
 
         self.running = True
 
-    def step(self):
+    def step(self, xor_val = None):
         self.cc = 0
         opcode = self.nextByte()
+        if (xor_val != None):
+            opcode = opcode ^ xor_val
         self.ops[opcode]()
 
     def execute(self, instruction):
@@ -829,6 +831,8 @@ class CPU:
         self.r.ZN(self.r.a)
 
     def STA(self, a):
+        #if (a > 0x2000):
+        #    print(f"STA {a:02X} = {self.r.a:02X}")
         self.mmu.write(a, self.r.a)
 
     def STX(self, a):
