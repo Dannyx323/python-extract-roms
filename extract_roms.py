@@ -34,7 +34,8 @@ CHR_SIZE_K = ["256k", "128k", "64k", "Invalid", "32k", "16k", "8k", "Invalid"]
 # look for mapper specific signatures (not guaranteed)
 def guess_mapper(data):
 
-  if data.find(b'\x8D\x00\x41') != -1: # STA $4100
+  if data.find(b'\x8D\x10\x20') != -1 or \
+     data.find(b'\x2C\x10\x20') != -1: # STA $2010 / xor'd
     mapper = 256
   elif data.find(b'\x8D\x01\x80') != -1 or \
        data.find(b'\x8E\x01\x80') != -1:     # STA/STX $8001 $8001
@@ -53,11 +54,11 @@ def write_header(handle, bank, mapper):
   handle.write(bank["prgSizeHeader"].to_bytes())
   handle.write(bank["chrSizeHeader"].to_bytes())
 
-  mirror = bank["mirror"]
+  mirror = bank["mirror"] & 1
 
   if mapper == 256:
     handle.write(mirror.to_bytes())
-    handle.write(b"\x0A\x01")
+    handle.write(b"\x0B\x01")
     handle.write(b"\0"*7)
   else:
     if mapper == 4:
@@ -65,21 +66,42 @@ def write_header(handle, bank, mapper):
     handle.write((mapper << 4 | mirror).to_bytes())
     handle.write(b"\0"*9)
 
-def write_rom(file_handle, title, bank, outdir):
+def write_rom(file_handle, title, bank, args):
 
+  rom = {}
   file_handle.seek(bank["prgAddr"])
-  prg_data = file_handle.read(bank["prgSize"])
+  rom["prg"] = file_handle.read(bank["prgSize"])
+
+  rom["mapper"] = guess_mapper(rom["prg"])
+
+  # adjust values for OneBus
+  if (rom["mapper"] == 256):
+    bank["chrAddr"] = shift_left(bank["chrAddr"], 1)
+    chrSizeIndex = bank["chrSizeIndex"]
+    if (chrSizeIndex != 0):
+      chrSizeIndex -= 1
+      if (CHR_SIZE[chrSizeIndex] == None):
+        chrSizeIndex -= 1
+    elif bank["mirror"] == 1: # coincidental workaround for broken games in gamer_v
+      chrSizeIndex = 2
+
+    bank["chrSize"] = CHR_SIZE[chrSizeIndex]
+    bank["chrSizeK"] = CHR_SIZE_K[chrSizeIndex]
+    bank["chrSizeHeader"] = CHR_SIZE_HDR[chrSizeIndex]
+    bank["chrSizeIndex"] = chrSizeIndex
+
   file_handle.seek(bank["chrAddr"])
-  chr_data = file_handle.read(bank["chrSize"])
+  rom["chr"] = file_handle.read(bank["chrSize"])
 
-  mapper = guess_mapper(prg_data)
+  if (args.rom_fn != None):
+    args.rom_fn(rom, args)
 
-  file_path = os.path.join(outdir, title) + ".nes"
-  print ("extracting " + file_path + (" (mapper " + str(mapper) + ") from data:" if DEBUG else ""))
+  file_path = os.path.join(args.outdir, title) + ".nes"
+  print ("extracting " + file_path + (" (mapper " + str(rom["mapper"]) + ") from data:" if DEBUG else ""))
   with open(file_path, "wb") as rom_handle:
-    write_header (rom_handle, bank, mapper)
-    rom_handle.write(prg_data)
-    rom_handle.write(chr_data)
+    write_header (rom_handle, bank, rom["mapper"])
+    rom_handle.write(rom["prg"])
+    rom_handle.write(rom["chr"])
     rom_handle.close()
 
   if DEBUG:
@@ -121,7 +143,8 @@ def process_banks(file_handle, args):
 
   data = []
 
-  while (len(data) < args.count):
+  max = args.count if "data_count" not in args else args.data_count
+  while (len(data) < max):
     bytes = file_handle.read(args.size)
     info = args.process_fn(bytes, args)
     if info:
@@ -156,7 +179,10 @@ def process_bank(bytes, indices, chr_offset = None):
 
   data["chrAddr"] = chr_offset + shift_left(to_16_bit(shift_right(bytes[indices["chrBank0"]], 4), bytes[indices["chrBank1"]] & 0b11111000), 10)
   data["chrAddrHex"] = f'{data["chrAddr"]:07X}'
+
   chr_size_index = bytes[indices["chrBank1"]] & 0b00000111
+
+  data["chrSizeIndex"] = chr_size_index
   data["chrSize"] = CHR_SIZE[chr_size_index]
   data["chrSizeK"] = CHR_SIZE_K[chr_size_index]
   data["chrSizeHeader"] = CHR_SIZE_HDR[chr_size_index]
@@ -202,16 +228,17 @@ def process_dynamic_bank(bytes, args):
   # stop_addr must point to an instruction
   while (args.cpu.r.pc != args.stop_addr):
     #print(f'{args.cpu.r.pc:04X}')
-    args.cpu.step()
+    args.cpu.step(args.xor_val)
 
   indices = {
     "outerBank":0, "chrBank0":1, "chrBank1":2,
-    "prgSize":3, "prgBank0":4, "prgBank1":5, "prgBank2":6, "prgBank3":7,
-    "mirror": 8
+    "prgSize":3, "prgBank0":4, "prgBank1":5, "prgBank2":6, "prgBank3":7, "mirror": 8
+    #"exGfx1": 9, "mapper": 10, "encryption": 11, "outerBank1":12, "outerBank2":13
   }
 
   newbytes = bytearray()
   for reg in [0x4100, 0x2018, 0x201A, 0x410B, 0x4107, 0x4108, 0x4109, 0x410A, 0xA000]:
+             #0x2010, 0x411D, 0x411E, 0x412C, 0x412E]:
     newbytes.append(args.mem.read(reg))
     #print('{0:04X}: {1:02X}'.format(reg, args.mem.read(reg)), end=", ")
 
@@ -241,14 +268,17 @@ def process_indexed_titles(file_handle, args):
   p = 0
 
   file_handle.seek(args.indices_addr)
-  while (p < args.count):
+  ct = args.count
+  max = ct if "data_count" not in args else args.data_count
+  while (p < max):
     lo = int.from_bytes(file_handle.read(1))
     hi = int.from_bytes(file_handle.read(1))
     i  = int.from_bytes(file_handle.read(1))
     file_handle.read(1) # discard the last byte which is always 0
 
-    val = args.titles_offset + to_16_bit(hi, lo)
-    pointers.append(val)
+    if (p < ct):
+      val = args.titles_offset + to_16_bit(hi, lo)
+      pointers.append(val)
 
     # this is how the correct title will be applied later
     args.indices.append(i)
@@ -259,6 +289,7 @@ def process_indexed_titles(file_handle, args):
   for pointer in pointers:
     file_handle.seek(pointer)
     titles.extend(process_titles(file_handle, args))
+  args.count = ct
 
   return titles
 
@@ -293,6 +324,18 @@ def process_retrogame_bank(bytes, args):
   data = process_bank(bytes, indices)
   return data
 
+# check if we should NOP out 3 bytes of JSR $6100
+def process_gamer_v_rom(rom, args):
+
+  seq = b"\x20\x00\x61"
+  if (seq in rom["prg"]):
+    # make mutable before continuing
+    rom["prg"] = bytearray(rom["prg"])
+    # no guarantee this is accurate
+    addr = rom["prg"].find(seq)
+    for i in range(3):
+      rom["prg"][addr + i] = 0xEA
+
 
 def set_args(args, defaults):
 
@@ -311,8 +354,11 @@ def export():
     globals()['DEBUG'] = True
 
   args.process_fn = None
+  args.rom_fn = None
   args.titles_fn = process_titles
   args.banks_fn = process_banks
+
+  args.xor_val = None
 
   if args.device == "retro_game_box":
     set_args(args, {
@@ -447,6 +493,33 @@ def export():
     args.titles_fn = process_indexed_titles
     args.process_fn = process_dynamic_bank
 
+  elif args.device == "gamer_v":
+    set_args(args, {
+      "titles": 0x70680,
+      "banks": 0x71335,
+      "separator": 255,
+      "end": 0,
+      "size": 0x0C,
+      # expected by setup_emu
+      "code_addr": 0x7E4F2,
+      "code_len": 0xF0,
+      "mem_addr": 0x0410,
+      # expected by process_dynamic_bank
+      "bank_data_addr": 0x0400,
+      "stop_addr": 0x0500,
+      "mirror_byte": 0x0B,
+      "xor_val": 0xA1,
+      # expected by process_indexed_titles
+      "indices_addr": 0x702D8,
+      "titles_offset": 0x68000,
+      "count": 220,
+      "data_count": 248
+    })
+    args.setup_fn = setup_emu
+    args.titles_fn = process_indexed_titles
+    args.process_fn = process_dynamic_bank
+    args.rom_fn = process_gamer_v_rom
+
   if args.filename == None:
     error += f'\nError: Filename is required!'
   elif not os.path.isfile(args.filename):
@@ -492,8 +565,11 @@ def export():
 
       for i in range(min(len(titles), len(banks))):
         bankIndex = i if "indices" not in args else args.indices[i]
-        print (f'{i+1:03n}. ', end = '')
-        write_rom(file_handle, titles[i], banks[bankIndex], args.outdir)
+        if bankIndex < len(banks):
+          print (f'{i+1:03n}. ', end = '')
+          write_rom(file_handle, titles[i], banks[bankIndex], args)
+        else:
+          print (f'{i+1:03n}. Index {i} not found for {titles[i]}')
 
   else:
     print ('\n')
@@ -516,7 +592,7 @@ def parse_args():
     parser.add_argument('-z', '--size', help='Size of each bank data entry, e.g. 9.', type=int)
     parser.add_argument('-s', '--separator', help='Character used to separate titles, e.g. 255.')
     parser.add_argument('-e', '--end', help='Character used to end titles, e.g. 0.', type=int)
-    parser.add_argument('-d', '--device', help='Device name (automatically sets values for the required arguments).', choices=["arcade_zone", "hkb_502", "jl3000", "mini_arcade", "oplayer", "qss", "retro_game_box", "retrogame"])
+    parser.add_argument('-d', '--device', help='Device name (automatically sets values for the required arguments).', choices=["arcade_zone", "gamer_v", "hkb_502", "jl3000", "mini_arcade", "oplayer", "qss", "retro_game_box", "retrogame"])
     parser.add_argument('-c', '--count', help='Max number of roms to parse, e.g. 10.', type=int)
     parser.add_argument('-o', '--outdir', help='Output directory.')
     parser.add_argument('-g', '--debug', help='Enable debug output.', action='store_true')
